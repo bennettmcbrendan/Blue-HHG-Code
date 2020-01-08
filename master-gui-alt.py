@@ -9,7 +9,7 @@ import u6
 # imports for figure imbed
 import matplotlib
 matplotlib.use("TkAgg")
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg 
 from matplotlib.figure import Figure, Axes
 
 # imports for figure animation
@@ -62,7 +62,7 @@ class Application(tk.Frame):
 
         toolbar_frame = tk.Frame(self)
         toolbar_frame.grid(row = 11,column = 11,columnspan = 2,sticky = tk.W+tk.E)
-        NavigationToolbar2TkAgg(self.canvas,toolbar_frame)
+        NavigationToolbar2Tk(self.canvas,toolbar_frame)
 
 
     def createWidgets(self):
@@ -147,7 +147,6 @@ class Application(tk.Frame):
         
         while i <= int(self.dqvalue.get()):
 
-            # u6.WaitShort(float(self.dfvalue.get())*1000000/64)
             time.sleep(float(self.dfvalue.get()))
             self.figdata_x.append(i)
             # voltage measurement as AIN port 0 minus GND port 15
