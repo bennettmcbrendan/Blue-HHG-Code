@@ -3,13 +3,13 @@ import tkinter as tk
 from tkinter import messagebox
 import pandas as pd
 from statistics import mean
-import time
+from datetime import datetime
 import u6
 
 # imports for figure imbed
 import matplotlib
 matplotlib.use("TkAgg")
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg 
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 from matplotlib.figure import Figure, Axes
 
 # imports for figure animation
@@ -32,6 +32,7 @@ class Application(tk.Frame):
 
         # define AINvalue variable to track latest voltage reading
         self.AINvalue = tk.StringVar()
+        self.EstFreqValue = tk.StringVar()
     
         # define figure
         self.figdata_x = [1,2,3,4,5]
@@ -62,7 +63,7 @@ class Application(tk.Frame):
 
         toolbar_frame = tk.Frame(self)
         toolbar_frame.grid(row = 11,column = 11,columnspan = 2,sticky = tk.W+tk.E)
-        NavigationToolbar2Tk(self.canvas,toolbar_frame)
+        NavigationToolbar2TkAgg(self.canvas,toolbar_frame)
 
 
     def createWidgets(self):
@@ -76,15 +77,15 @@ class Application(tk.Frame):
         self.mavalue.grid(row = 1,column = 1,columnspan = 2)
         
         # DataQuant Label
-        self.dataquant = tk.Label(self,text = 'Number of measurements to make (integer)')
+        self.dataquant = tk.Label(self,text = 'Data to take (mult of 600)')
         self.dataquant.grid(row = 2,column = 0)
-        
+
         # DataQuant Entry
         self.dqvalue = tk.Entry(self)
         self.dqvalue.grid(row = 2,column = 1,columnspan = 2)
 
         # DataFreq Label
-        self.datafreq = tk.Label(self, text = 'Time between measurements (s)')
+        self.datafreq = tk.Label(self, text = 'Stream Frequency (Hz)')
         self.datafreq.grid(row = 3,column = 0)
 
         # DataFreq Entry
@@ -102,7 +103,7 @@ class Application(tk.Frame):
         
         # DataRes Label
         # can be 1-8, with 8 the highest resolution
-        self.datares = tk.Label(self,text = 'Resolution Index (recommend 8)')
+        self.datares = tk.Label(self,text = 'Resolution Index (recommend 4)')
         self.datares.grid(row = 5,column = 0)
 
         # DataRes Entry
@@ -121,13 +122,21 @@ class Application(tk.Frame):
         self.startscan = tk.Button(self,text = 'Start Scan',command = self.startscanCallback)
         self.startscan.grid(row = 7,column = 0)
         
+        # Est Freq Label
+        self.estfreq = tk.Label(self,text = 'Estimated Scan Frequency (Hz)')
+        self.estfreq.grid(row = 8,column = 0)
+
+        # Est Freq Entry
+        self.efvalue = tk.Entry(self,textvariable = self.EstFreqValue)
+        self.efvalue.grid(row = 8,column = 1)
+        
         # Filename Label
         self.filename = tk.Label(self,text = 'csv filename for scan results (rel to current dir)')
-        self.filename.grid(row = 8,column = 0)
+        self.filename.grid(row = 9,column = 0)
 
         # Filename Entry
         self.fnvalue = tk.Entry(self)
-        self.fnvalue.grid(row = 8,column = 1,columnspan = 2)
+        self.fnvalue.grid(row = 9,column = 1,columnspan = 2)
 
     def readAINCallback(self):
 
@@ -142,33 +151,71 @@ class Application(tk.Frame):
         self.figdata_x = [] # measurement index
         self.figdata_z = [] # voltage measurement
         self.figdata_y = [] # convert to current - goes on figure
-
-        i = 1
+        errorString = []
         
-        while i <= int(self.dqvalue.get()):
-
-            time.sleep(float(self.dfvalue.get()))
-            self.figdata_x.append(i)
-            # voltage measurement as AIN port 0 minus GND port 15
-            # gainIndex set to x1
-            self.figdata_z.append(labjack.getAIN(positiveChannel = 0, resolutionIndex=int(self.drvalue.get()), 
-                                                 gainIndex=0, settlingFactor=int(self.dsvalue.get())) -
-                                  labjack.getAIN(positiveChannel = 15, resolutionIndex=int(self.drvalue.get()), 
-                                                 gainIndex=0, settlingFactor=int(self.dsvalue.get())))
-    
-            self.figdata_y.append(self.figdata_z[i-1] / float(self.mavalue.get()))
+        labjack.streamConfig(NumChannels=2, ChannelNumbers=[0,15], ChannelOptions=[0,0], 
+                             SettlingFactor=int(self.dsvalue.get()), ResolutionIndex=int(self.drvalue.get()), 
+                             ScanFrequency=float(self.dfvalue.get()))
+        
+        # stop stream in case there is one ongoing
+        if labjack.streamStarted:
+            labjack.streamStop()
             
-            i = i+1
-            
-            if i%10 == 0:
-                self.update()
-     
-        self.update()
+        self.scandata = pd.DataFrame()
+   
+        dataCount = 0
+        packetCount = 0     
                
-        self.scandata = pd.DataFrame({'Measurement':self.figdata_x,
-                                    'Voltage (V)':self.figdata_z,
-                                    'Ampere (A)':self.figdata_y})
-    
+        labjack.streamStart()
+        
+        # code here directly from https://github.com/labjack/LabJackPython/blob/master/Examples/streamTest.py
+        # we have 25 samples per packet and 48 packets per data request for a total of 1200 samples per data request
+        self.starttime = datetime.now()
+        
+        for r in labjack.streamData():
+            if r is not None:
+                # Our stop condition
+                if dataCount >= float(self.dqvalue.get()):
+                    break
+
+                if r["errors"] != 0:
+                    errorString.append("Errors counted: %s ; %s\n" % (r["errors"], datetime.now()))
+
+                if r["numPackets"] != labjack.packetsPerRequest:
+                    errorString.append("----- UNDERFLOW : %s ; %s\n" % (r["numPackets"], datetime.now()))
+
+                if r["missed"] != 0:
+                    # missed += r['missed']
+                    errorString.append("+++ Missed %s\n" % r["missed"])
+
+                self.scandata = pd.concat([self.scandata,
+                                        pd.DataFrame({
+                                        'AIN Voltage (V)':r['AIN0'],
+                                        # 'GND Voltage (V)':r['GND'],
+                                        'Data Request':dataCount,
+                                        'Packets per Request':r['numPackets']})])
+                        
+                dataCount += 1
+                packetCount += r['numPackets']
+            else:
+                        # Got no data back from our read.
+                        # This only happens if your stream isn't faster than the USB read
+                        # timeout, ~1 sec.
+                print("No data ; %s" % datetime.now())
+
+        self.stoptime = datetime.now()
+        self.delta = (self.stoptime-self.starttime).seconds + (self.stoptime-self.starttime).microseconds/1000000
+        self.EstFreqValue.set(600*dataCount/self.delta)        
+        
+        labjack.streamStop() 
+        
+        self.figdata_x = list(range(len(self.scandata['Data Request'])))
+        self.figdata_z = self.scandata['AIN Voltage (V)']
+        self.figdata_y = self.figdata_z * float(self.mavalue.get())
+        
+        self.update()
+                         
+        self.scandata['Current (A)'] = self.scandata['AIN Voltage (V)'] * float(self.mavalue.get())
         self.scandata.to_csv(self.fnvalue.get(),index = False)
 
 # Run the GUI
