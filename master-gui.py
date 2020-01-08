@@ -148,7 +148,8 @@ class Application(tk.Frame):
         
         while i <= int(self.dqvalue.get()):
 
-            time.sleep(float(self.dfvalue.get()))
+            u6.WaitShort(float(self.dfvalue.get())*1000000/64)
+            # time.sleep(float(self.dfvalue.get()))
             self.figdata_x.append(i)
             # voltage measurement as AIN port 0 minus GND port 15
             # gainIndex set to x1
