@@ -9,7 +9,7 @@ import u6
 # imports for figure imbed
 import matplotlib
 matplotlib.use("TkAgg")
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 from matplotlib.figure import Figure, Axes
 
 # imports for figure animation
@@ -63,7 +63,7 @@ class Application(tk.Frame):
 
         toolbar_frame = tk.Frame(self)
         toolbar_frame.grid(row = 11,column = 11,columnspan = 2,sticky = tk.W+tk.E)
-        NavigationToolbar2Tk(self.canvas,toolbar_frame)
+        NavigationToolbar2TkAgg(self.canvas,toolbar_frame)
 
 
     def createWidgets(self):
@@ -210,7 +210,8 @@ class Application(tk.Frame):
         labjack.streamStop() 
         
         self.figdata_x = list(range(len(self.scandata['Data Request'])))
-        self.figdata_z = self.scandata['AIN Voltage (V)'] - self.scandata['GND Voltage (V)']
+        # Emma and I think that the GND is already subtracted out on the AIN0 reading
+        self.figdata_z = self.scandata['AIN Voltage (V)'] # - self.scandata['GND Voltage (V)']
         # Keithley 6485 manual: ANALOG OUT provides a scaled, inverting ±2V output
         self.figdata_y = (self.figdata_z*(-1) + 2)/4 * float(self.mavalue.get())
         
