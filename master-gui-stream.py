@@ -9,7 +9,7 @@ import u6
 # imports for figure imbed
 import matplotlib
 matplotlib.use("TkAgg")
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure, Axes
 
 # imports for figure animation
@@ -63,7 +63,7 @@ class Application(tk.Frame):
 
         toolbar_frame = tk.Frame(self)
         toolbar_frame.grid(row = 11,column = 11,columnspan = 2,sticky = tk.W+tk.E)
-        NavigationToolbar2TkAgg(self.canvas,toolbar_frame)
+        NavigationToolbar2Tk(self.canvas,toolbar_frame)
 
 
     def createWidgets(self):
@@ -190,10 +190,10 @@ class Application(tk.Frame):
 
                 self.scandata = pd.concat([self.scandata,
                                         pd.DataFrame({
-                                        'AIN Voltage (V)':r['AIN0'],
-                                        # 'GND Voltage (V)':r['GND'],
                                         'Data Request':dataCount,
-                                        'Packets per Request':r['numPackets']})])
+                                        'Packets per Request':r['numPackets'],
+                                        'AIN Voltage (V)':r['AIN0'],
+                                        'GND Voltage (V)':r['AIN15']})])
                         
                 dataCount += 1
                 packetCount += r['numPackets']
@@ -210,12 +210,14 @@ class Application(tk.Frame):
         labjack.streamStop() 
         
         self.figdata_x = list(range(len(self.scandata['Data Request'])))
-        self.figdata_z = self.scandata['AIN Voltage (V)']
-        self.figdata_y = self.figdata_z * float(self.mavalue.get())
+        self.figdata_z = self.scandata['AIN Voltage (V)'] - self.scandata['GND Voltage (V)']
+        # Keithley 6485 manual: ANALOG OUT provides a scaled, inverting ±2V output
+        self.figdata_y = (self.figdata_z*(-1) + 2)/4 * float(self.mavalue.get())
         
         self.update()
-                         
-        self.scandata['Current (A)'] = self.scandata['AIN Voltage (V)'] * float(self.mavalue.get())
+        
+        self.scandata['Voltage (V)'] = self.figdata_z                 
+        self.scandata['Current (A)'] = self.figdata_y
         self.scandata.to_csv(self.fnvalue.get(),index = False)
 
 # Run the GUI
