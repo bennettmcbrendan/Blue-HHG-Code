@@ -5,6 +5,7 @@ import pandas as pd
 from statistics import mean
 from datetime import datetime
 import u6
+import os
 
 # imports for figure imbed
 import matplotlib
@@ -33,6 +34,9 @@ class Application(tk.Frame):
         # define AINvalue variable to track latest voltage reading
         self.AINvalue = tk.StringVar()
         self.EstFreqValue = tk.StringVar()
+        self.cwd = tk.StringVar()
+        
+        self.cwd.set(os.getcwd())
     
         # define figure
         self.figdata_x = [1,2,3,4,5]
@@ -131,12 +135,20 @@ class Application(tk.Frame):
         self.efvalue.grid(row = 8,column = 1)
         
         # Filename Label
-        self.filename = tk.Label(self,text = 'csv filename for scan results (rel to current dir)')
+        self.filename = tk.Label(self,text = 'csv filename for scan results')
         self.filename.grid(row = 9,column = 0)
 
         # Filename Entry
         self.fnvalue = tk.Entry(self)
         self.fnvalue.grid(row = 9,column = 1,columnspan = 2)
+        
+        # Folder name Label
+        self.foldername = tk.Label(self,text = 'save folder (/ or \)')
+        self.foldername.grid(row = 10,column = 0)
+
+        # Folder name Entry
+        self.flnmvalue = tk.Entry(self,textvariable = self.cwd)
+        self.flnmvalue.grid(row = 10,column = 1,columnspan = 2)
 
     def readAINCallback(self):
 
@@ -219,7 +231,7 @@ class Application(tk.Frame):
         
         self.scandata['Voltage (V)'] = self.figdata_z                 
         self.scandata['Current (A)'] = self.figdata_y
-        self.scandata.to_csv(self.fnvalue.get(),index = False)
+        self.scandata.to_csv(self.flnmvalue.get() + '/' + self.fnvalue.get(),index = False)
 
 # Run the GUI
 app = Application()
